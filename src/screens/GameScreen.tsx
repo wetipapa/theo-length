@@ -21,8 +21,14 @@ import type { ItemBlock, Placed, Piece, RunResult } from "../types";
 
 /** 다리 양쪽 교대의 폭(px). 아래 `w-9`와 같은 값이어야 한다 */
 const ABUTMENT = 36;
-/** 계곡이 상판 아래로 내려오는 길이(px). 계곡 그림 높이 86에서 상판에 가린 20을 뺀 값 */
-const VALLEY_DROP = 66;
+/**
+ * 계곡 그림의 높이(px)와, 그것이 상판 아래로 내려오는 길이.
+ *
+ * 계곡을 깊게 그리면 그림이 세로 공간을 채워서, 문제와 조각 트레이 사이가
+ * 휑하게 비는 것도 같이 줄어든다. 상판에 20px이 가리므로 그만큼 뺀 값이 실제로 내려오는 길이다.
+ */
+const VALLEY_H = 116;
+const VALLEY_DROP = VALLEY_H - 20;
 
 interface GameScreenProps {
   settings: Settings;
@@ -111,7 +117,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
     !problem.pair.top.some(
       (t) =>
         !cleared.has(t.id) &&
-        problem.pair!.bottom.some((b) => b.name === t.name && !cleared.has(b.id)),
+        problem.pair!.bottom.some((b) => b.kind === t.kind && !cleared.has(b.id)),
     );
 
   /** 맞혔다. 점수를 주고 다음 문제로 넘긴다 */
@@ -222,7 +228,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
     (block: ItemBlock, row: "top" | "bottom") => {
       if (crossing || paused || !problem.pair) return;
       const other = (row === "top" ? problem.pair.bottom : problem.pair.top).find(
-        (b) => b.name === block.name && !cleared.has(b.id),
+        (b) => b.kind === block.kind && !cleared.has(b.id),
       );
       if (!other) {
         wobble();
@@ -296,14 +302,20 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
 
       <div
         ref={bridgeRef}
-        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-3"
+        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden px-3 pb-1"
       >
-        {/* 문구를 판과 한 덩어리로 묶어 가운데 정렬한다.
-            맨 위에 붙여 두면 남는 세로 공간이 전부 문구와 판 사이로 몰려
-            둘이 상관없는 것처럼 멀어진다 */}
-        <p className="mb-1 w-full max-w-sm rounded-2xl border-2 border-[var(--color-line)] bg-[var(--color-card)] px-4 py-2.5 text-center text-sm font-black text-[var(--color-ink)]">
-          {problem.prompt}
-        </p>
+        {/* 문제. 판과 한 덩어리로 묶어 가운데 정렬한다 —
+            맨 위에 붙여 두면 남는 세로 공간이 전부 문제와 판 사이로 몰려
+            둘이 상관없는 것처럼 멀어진다.
+
+            글씨를 키우고 어깨에 「문제」를 박아 둔다. 예전에는 안내 문구와 같은 크기,
+            같은 색이라 무엇이 물음이고 무엇이 거드는 말인지 구별이 안 됐다 */}
+        <div className="relative mb-1 w-full max-w-sm rounded-2xl border-2 border-[var(--color-accent-soft)] bg-white px-4 pb-3 pt-4 shadow-[0_3px_0_var(--color-accent-tint)]">
+          <span className="absolute -top-2.5 left-4 rounded-full bg-[var(--color-accent)] px-2.5 text-[11px] font-black leading-[20px] text-white">
+            문제 {round + 1}
+          </span>
+          <p className="text-center text-base font-black leading-snug text-[var(--color-ink)]">{problem.prompt}</p>
+        </div>
 
         {/* 재야 할 자 — measure·offset 문제에만 나온다 */}
         {problem.onRuler && (
@@ -339,6 +351,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
           <PairRows
             top={problem.pair.top}
             bottom={problem.pair.bottom}
+            unknown={problem.pair.unknown}
             unitPx={unitPx}
             cleared={cleared}
             onTap={cancel}
@@ -406,7 +419,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                   선분 문제에서 위쪽 호 자리까지 올라와 숫자를 덮는다 */}
               <div
                 className="pointer-events-none absolute left-9 right-9 top-9 -z-10 rounded-b-[40px] bg-gradient-to-b from-[#bfe3ea] to-[#8ec9d4]"
-                style={{ height: 86 }}
+                style={{ height: VALLEY_H }}
                 aria-hidden="true"
               />
               <div className="h-14 w-9 rounded-l-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />

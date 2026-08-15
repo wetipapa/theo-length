@@ -108,14 +108,15 @@ export interface PathBoard {
   vertices: { x: number; y: number }[];
 }
 
+/** 두 줄 견주기에 나오는 물건. 이름이 아니라 **그림**으로 구별한다 */
+export type ObjectKind = "log" | "match" | "pencil" | "straw" | "brush" | "eraser";
+
 /** 두 줄 견주기의 물건 하나 */
 export interface ItemBlock {
   id: number;
-  /** 통나무·성냥·연필처럼 아이가 아는 물건 이름 */
-  name: string;
+  kind: ObjectKind;
   units: number;
-  color: string;
-  /** 길이를 숫자로 알려주는지. 모르는 물건은 `?`로 나온다 */
+  /** 길이를 알려주는 물건인지. 모르는 물건은 범례에 `?`로 나온다 */
   known: boolean;
 }
 
@@ -128,8 +129,8 @@ export interface ItemBlock {
 export interface PairBoard {
   top: ItemBlock[];
   bottom: ItemBlock[];
-  /** 모르는 물건의 이름. 이게 몇 칸인지가 답이다 */
-  unknown: string;
+  /** 모르는 물건. 이게 몇 칸인지가 답이다 */
+  unknown: ObjectKind;
   /** 모르는 물건이 아래 줄에 몇 개 있는지 */
   unknownCount: number;
 }

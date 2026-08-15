@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LEVELS, RULES, type LevelId } from "../config/gameConfig";
 import { makeProblem, makeRun, sumUnits, withParticle, type Rng } from "./problems";
+import { OBJECT_NAMES } from "../components/LengthObject";
 import type { ProblemKind } from "../types";
 
 function seeded(seed: number): Rng {
@@ -311,15 +312,15 @@ describe("같은 전체를 두 가지로", () => {
   it("겹치는 물건을 다 지우면 아는 것 하나와 모르는 것들만 남는다", () => {
     each(149, ["cancelPair"], 150, (p) => {
       const { top, bottom, unknown, unknownCount } = p.pair!;
-      const common = new Set(top.map((t) => t.name).filter((n) => bottom.some((b) => b.name === n)));
+      const common = new Set(top.map((t) => t.kind).filter((n) => bottom.some((b) => b.kind === n)));
 
-      const leftTop = top.filter((t) => !common.has(t.name));
-      const leftBottom = bottom.filter((b) => !common.has(b.name));
+      const leftTop = top.filter((t) => !common.has(t.kind));
+      const leftBottom = bottom.filter((b) => !common.has(b.kind));
 
       expect(leftTop, "위에는 아는 것 하나만 남아야 한다").toHaveLength(1);
       expect(leftTop[0].known).toBe(true);
       expect(leftBottom).toHaveLength(unknownCount);
-      expect(leftBottom.every((b) => b.name === unknown && !b.known)).toBe(true);
+      expect(leftBottom.every((b) => b.kind === unknown && !b.known)).toBe(true);
 
       // 남은 것끼리 견주면 답이 그대로 나온다
       expect(leftTop[0].units).toBe(p.target * unknownCount);
@@ -330,9 +331,9 @@ describe("같은 전체를 두 가지로", () => {
     // 한쪽에 하나 더 있으면 지우다가 짝이 없어 막힌다
     each(151, ["cancelPair"], 150, (p) => {
       const { top, bottom } = p.pair!;
-      const count = (list: typeof top, name: string) => list.filter((b) => b.name === name).length;
-      for (const name of new Set(top.map((t) => t.name))) {
-        if (!bottom.some((b) => b.name === name)) continue;
+      const count = (list: typeof top, name: string) => list.filter((b) => b.kind === name).length;
+      for (const name of new Set(top.map((t) => t.kind))) {
+        if (!bottom.some((b) => b.kind === name)) continue;
         expect(count(top, name)).toBe(count(bottom, name));
       }
     });
@@ -344,17 +345,30 @@ describe("같은 전체를 두 가지로", () => {
       expect(unknowns.length).toBeGreaterThanOrEqual(2);
       expect(unknowns.every((b) => b.units === p.target)).toBe(true);
       expect(p.prompt).not.toContain(`${p.target}칸`);
-      // 무엇의 길이를 묻는지 이름으로 말해 줘야 한다
-      expect(p.prompt).toContain(p.pair!.unknown);
-      expect(p.note).toContain(p.pair!.unknown);
+      // 무엇의 길이를 묻는지 이름으로 말해 줘야 한다.
+      // 그림만으로는 "이게 성냥인지 붓인지"를 문구와 이을 수 없다
+      const name = OBJECT_NAMES[p.pair!.unknown];
+      expect(p.prompt).toContain(name);
+      expect(p.note).toContain(name);
     });
   });
 
-  it("물건 이름이 겹치지 않는다", () => {
-    // 아는 것과 모르는 것이 같은 이름이면 무엇을 지웠는지 알 수 없다
+  it("물건 그림이 겹치지 않는다", () => {
+    // 아는 것과 모르는 것이 같은 그림이면 무엇을 지웠는지 알 수 없다
     each(163, ["cancelPair"], 120, (p) => {
-      const names = new Set([...p.pair!.top, ...p.pair!.bottom].map((b) => b.name));
-      expect(names.size).toBe(3);
+      const kinds = new Set([...p.pair!.top, ...p.pair!.bottom].map((b) => b.kind));
+      expect(kinds.size).toBe(3);
+    });
+  });
+
+  it("범례에 쓸 길이가 물건마다 하나로 정해진다", () => {
+    // 같은 그림인데 3칸짜리와 5칸짜리가 섞여 있으면 위쪽 범례가 거짓말이 된다
+    each(181, ["cancelPair"], 150, (p) => {
+      const byKind = new Map<string, number>();
+      for (const b of [...p.pair!.top, ...p.pair!.bottom]) {
+        if (byKind.has(b.kind)) expect(byKind.get(b.kind), b.kind).toBe(b.units);
+        byKind.set(b.kind, b.units);
+      }
     });
   });
 });

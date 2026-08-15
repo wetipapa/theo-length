@@ -1,5 +1,6 @@
 import { PIECE_COLORS, RULES, type LevelId, type LevelSet } from "../config/gameConfig";
-import type { Arc, ItemBlock, Piece, Problem, ProblemKind } from "../types";
+import { OBJECT_NAMES } from "../components/LengthObject";
+import type { Arc, ItemBlock, ObjectKind, Piece, Problem, ProblemKind } from "../types";
 
 export type Rng = () => number;
 
@@ -370,15 +371,8 @@ function bentPath(level: LevelSet, rng: Rng, bends: number): Problem {
 // 같은 전체를 두 가지로 만들기
 // ──────────────────────────────────────────────────────────────
 
-/** 아이가 길이를 떠올릴 수 있는 물건들. 이름이 길면 조각 안에 안 들어간다 */
-const ITEMS = [
-  { name: "통나무", color: "#8a6a4a" },
-  { name: "성냥", color: "#E8536F" },
-  { name: "연필", color: "#F0A02E" },
-  { name: "빨대", color: "#4B9BD5" },
-  { name: "붓", color: "#6FB566" },
-  { name: "지우개", color: "#A97BD8" },
-] as const;
+/** 두 줄 견주기에 나오는 물건들. 그림으로 구별하므로 굵기·모양이 서로 달라야 한다 */
+const ITEMS: ObjectKind[] = ["log", "match", "pencil", "straw", "brush", "eraser"];
 
 /**
  * 위아래 두 줄이 같은 길이다. 모르는 물건 하나가 몇 칸인지 알아낸다.
@@ -390,20 +384,21 @@ const ITEMS = [
  * 조각에 눈금을 그리지 않는다. 셀 수 있으면 지울 이유가 없다.
  */
 function cancelPair(level: LevelSet, rng: Rng): Problem {
-  const [known, common, unknown] = shuffle(rng, [...ITEMS]).slice(0, 3);
+  const [known, common, unknown] = shuffle(rng, ITEMS).slice(0, 3);
 
   const unknownUnits = randInt(rng, 2, Math.min(4, Math.floor(level.target.max / 2)));
   const unknownCount = randInt(rng, 2, 3);
   const knownUnits = unknownUnits * unknownCount; // 아는 것 하나 = 모르는 것 여러 개
-  const commonUnits = randInt(rng, 2, 3);
-  const commonCount = randInt(rng, 2, 3);
+  // 두 줄이 길수록 한 칸이 좁게 그려지고, 아래 다리는 답(2~4칸)만큼이라 손톱만 해진다.
+  // 공통 물건은 짧게, 개수는 둘까지만 둔다
+  const commonUnits = randInt(rng, 1, 2);
+  const commonCount = 2;
 
   let id = 0;
-  const block = (it: { name: string; color: string }, units: number, isKnown: boolean): ItemBlock => ({
+  const block = (kind: ObjectKind, units: number, isKnown: boolean): ItemBlock => ({
     id: id++,
-    name: it.name,
+    kind,
     units,
-    color: it.color,
     known: isKnown,
   });
 
@@ -412,7 +407,7 @@ function cancelPair(level: LevelSet, rng: Rng): Problem {
   return {
     kind: "cancelPair",
     target: unknownUnits,
-    prompt: `위아래 길이가 같아요. ${unknown.name} 하나는 몇 칸일까요?`,
+    prompt: `위아래 길이가 같아요. ${OBJECT_NAMES[unknown]} 하나는 몇 칸일까요?`,
     tellsTarget: false,
     tray: freeTray(rng, unknownUnits),
     rulerSpan: level.target.max + 2,
@@ -423,10 +418,10 @@ function cancelPair(level: LevelSet, rng: Rng): Problem {
         ...commons(),
         ...Array.from({ length: unknownCount }, () => block(unknown, unknownUnits, false)),
       ]),
-      unknown: unknown.name,
+      unknown,
       unknownCount,
     },
-    note: `${known.name} ${knownUnits}칸이 ${unknown.name} ${unknownCount}개와 같아요. 그래서 ${unknownUnits}칸이에요`,
+    note: `${OBJECT_NAMES[known]} ${knownUnits}칸이 ${OBJECT_NAMES[unknown]} ${unknownCount}개와 같아요. 그래서 ${unknownUnits}칸이에요`,
   };
 }
 
