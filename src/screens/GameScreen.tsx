@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BentPath, pathPad } from "../components/BentPath";
+import { NumberLine } from "../components/NumberLine";
+import { PairRows } from "../components/PairRows";
 import { PieceBar } from "../components/PieceBar";
 import { Ruler } from "../components/Ruler";
+import { SegmentArcs } from "../components/SegmentArcs";
 import { Button } from "../components/ui/Button";
 import { LEVELS, RULES, type Settings } from "../config/gameConfig";
 import {
@@ -13,7 +17,10 @@ import {
   playUndo,
 } from "../lib/feedback";
 import { makeRun, sumUnits } from "../lib/problems";
-import type { Placed, Piece, RunResult } from "../types";
+import type { ItemBlock, Placed, Piece, RunResult } from "../types";
+
+/** 다리 양쪽 교대의 폭(px). 아래 `w-9`와 같은 값이어야 한다 */
+const ABUTMENT = 36;
 
 interface GameScreenProps {
   settings: Settings;
@@ -25,29 +32,36 @@ interface GameScreenProps {
 /**
  * 게임 화면.
  *
- * 한 가지 조작만 있다 — **트레이 조각을 다리 위로 끌어다 놓는다.**
- * 문제 종류가 다섯이지만 아이가 하는 일은 늘 같아서, 새 개념을 만나도 조작을 다시 배우지 않는다.
+ * 문제 종류가 열둘이지만 **조작은 둘뿐이다.**
+ * 대부분은 트레이 조각을 눌러 틈을 채우고, 수직선 문제만 눈금을 짚는다.
+ * 새 개념을 만날 때마다 조작을 다시 배우게 하지 않으려고 이렇게 묶었다.
  *
- * 판정은 자동이다. 합이 목표와 같아지는 순간 바로 다리가 완성된다.
- * 버튼을 눌러 "확인"하게 만들면 맞혀 놓고도 한 단계를 더 거쳐야 해서 손맛이 죽는다.
+ * 판정은 자동이다. 딱 맞는 순간 바로 완성된다.
+ * "확인" 버튼을 두면 맞혀 놓고도 한 단계를 더 거쳐야 해서 손맛이 죽는다.
  */
 export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenProps) {
   const level = LEVELS[settings.level];
-  const [problems] = useState(() => makeRun(level, Math.random));
+  const [problems] = useState(() => makeRun(level, Math.random, settings.level));
   const [round, setRound] = useState(0);
   const [placed, setPlaced] = useState<Placed[]>([]);
   const [score, setScore] = useState(0);
   const [perfect, setPerfect] = useState(0);
-  const [removedAny, setRemovedAny] = useState(false);
+  const [missed, setMissed] = useState(false);
   const [crossing, setCrossing] = useState(false);
   const [shake, setShake] = useState(false);
   const [paused, setPaused] = useState(false);
+  /** 두 줄 견주기에서 이미 지운 물건들 */
+  const [cleared, setCleared] = useState<Set<number>>(() => new Set());
 
   const bridgeRef = useRef<HTMLDivElement>(null);
   const nextKey = useRef(1);
   const problem = problems[round];
   const filled = sumUnits(placed);
   const remaining = problem.target - filled;
+
+  // 수직선 문제에서 아이가 짚고 있는 자리. 왼쪽 수에서 시작한다.
+  // 문제가 바뀔 때 같이 옮긴다 — effect로 맞추면 한 프레임 동안 지난 문제의 자리가 그려진다
+  const [marker, setMarker] = useState(() => problems[0].numberLine?.a ?? 0);
 
   // 한 칸의 픽셀 길이. 목표가 길어도 화면 밖으로 나가지 않게 폭에 맞춰 줄인다.
   // 이 값이 게임 안의 "1칸"이고, 실제 1cm가 아니다.
@@ -59,11 +73,21 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
   const unitPx = useMemo(() => {
-    // 자가 나오는 문제만 자 길이에 맞춘다. 안 나오는데 자 길이로 재면
-    // 다리가 쓸데없이 작아져 조각을 누르기도 세기도 어렵다.
-    const widest = problem.onRuler ? problem.rulerSpan : problem.target;
-    return Math.max(14, Math.min(46, Math.floor((boxWidth - 12) / widest)));
+    // 화면에 나오는 것 중 **가장 넓은 것**에 맞춘다. 하나만 보고 정하면 나머지가 넘친다 —
+    // 다리는 양쪽 교대(각 36px)까지 자리를 먹는데 그걸 빼먹으면 다리 끝이 화면 밖으로 나간다.
+    const avail = boxWidth - 12;
+    const limits: number[] = [];
+    if (!problem.numberLine) {
+      const bridge = problem.line ? problem.line.span : problem.target;
+      limits.push((avail - ABUTMENT * 2) / bridge);
+    }
+    if (problem.onRuler) limits.push(avail / problem.rulerSpan);
+    if (problem.numberLine) limits.push(avail / problem.numberLine.span);
+    if (problem.path) limits.push((avail - ABUTMENT * 2) / problem.path.cols);
+    if (problem.pair) limits.push(avail / sumUnits(problem.pair.top));
+    return Math.max(13, Math.min(46, Math.floor(Math.min(...limits))));
   }, [boxWidth, problem]);
 
   const finish = useCallback(
@@ -79,58 +103,164 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
     [bestScore, onEnd, problems.length],
   );
 
-  /** 조각을 다리에 올린다. 남은 틈보다 길면 들어가지 않는다 */
-  const place = useCallback(
-    (piece: Piece) => {
-      if (crossing || paused) return;
-      if (piece.units > remaining) {
-        // 벌점 없이 되돌린다. 틀린 게 아니라 "이건 안 들어간다"를 보여 줄 뿐이다
-        playTooLong();
-        setShake(true);
-        window.setTimeout(() => setShake(false), 360);
-        return;
-      }
+  /** 양쪽에 겹치는 물건이 아직 남아 있는가 */
+  const pairSettled =
+    !problem.pair ||
+    !problem.pair.top.some(
+      (t) =>
+        !cleared.has(t.id) &&
+        problem.pair!.bottom.some((b) => b.name === t.name && !cleared.has(b.id)),
+    );
 
-      const next = [...placed, { key: nextKey.current++, ...piece }];
-      setPlaced(next);
-      playSnap(next.length - 1);
+  /** 맞혔다. 점수를 주고 다음 문제로 넘긴다 */
+  const solve = useCallback(() => {
+    const gained = RULES.baseScore + (missed ? 0 : RULES.perfectBonus);
+    const nextScore = score + gained;
+    const nextPerfect = perfect + (missed ? 0 : 1);
+    setScore(nextScore);
+    setPerfect(nextPerfect);
+    setCrossing(true);
+    playComplete();
+    window.setTimeout(playCross, 220);
 
-      if (sumUnits(next) !== problem.target) return;
-
-      // 딱 맞았다 — 다리가 완성되고 수레가 건넌다
-      const gained = RULES.baseScore + (removedAny ? 0 : RULES.perfectBonus);
-      const nextScore = score + gained;
-      const nextPerfect = perfect + (removedAny ? 0 : 1);
-      setScore(nextScore);
-      setPerfect(nextPerfect);
-      setCrossing(true);
-      playComplete();
-      window.setTimeout(playCross, 220);
-
-      window.setTimeout(() => {
+    // 짚어 주는 말이 있으면 조금 더 머문다. 관계를 읽을 틈은 줘야 한다
+    window.setTimeout(
+      () => {
         if (round + 1 >= problems.length) {
           finish(nextScore, nextPerfect);
           return;
         }
         setRound((r) => r + 1);
+        setMarker(problems[round + 1].numberLine?.a ?? 0);
+        setCleared(new Set());
         setPlaced([]);
-        setRemovedAny(false);
+        setMissed(false);
         setCrossing(false);
-      }, 1700);
+      },
+      problem.note ? 2600 : 1700,
+    );
+  }, [missed, score, perfect, round, problems, finish, problem.note]);
+
+  /** 헛짚었다. 벌점은 없고 보너스만 놓친다 */
+  const wobble = useCallback(() => {
+    playTooLong();
+    setShake(true);
+    window.setTimeout(() => setShake(false), 360);
+  }, []);
+
+  /**
+   * 조각을 다리에 올린다.
+   *
+   * `autoRepeat` 문제는 **정해진 개수만큼 한꺼번에** 놓는다. 한 개씩 놓게 하면
+   * 아이는 그냥 채우다 맞추게 되고, 셋이 같은 길이라는 게 안 보인다.
+   */
+  const place = useCallback(
+    (piece: Piece) => {
+      if (crossing || paused || !pairSettled) return;
+      const copies = problem.autoRepeat ?? 1;
+      if (piece.units * copies > remaining) {
+        // 벌점 없이 되돌린다. 틀린 게 아니라 "이건 안 들어간다"를 보여 줄 뿐이다
+        wobble();
+        return;
+      }
+
+      const next = [
+        ...placed,
+        ...Array.from({ length: copies }, () => ({ key: nextKey.current++, ...piece })),
+      ];
+      setPlaced(next);
+      playSnap(next.length - 1);
+      if (sumUnits(next) === problem.target) solve();
     },
-    [crossing, paused, remaining, placed, problem.target, removedAny, score, perfect, round, problems.length, finish],
+    [crossing, paused, pairSettled, problem.autoRepeat, problem.target, remaining, placed, wobble, solve],
   );
 
-  /** 놓은 조각을 도로 빼낸다. 언제든 고칠 수 있어야 한다 */
+  /**
+   * 놓은 조각을 도로 빼낸다. 언제든 고칠 수 있어야 한다.
+   *
+   * `autoRepeat` 문제는 통째로 빠지고 **보너스도 잃지 않는다.** 거기서는 여러 길이를
+   * 대 보는 것이 곧 푸는 방법이라, 대 봤다고 점수를 깎으면 대 보지 않게 된다.
+   */
   const remove = useCallback(
     (key: number) => {
       if (crossing || paused) return;
-      setPlaced((prev) => prev.filter((p) => p.key !== key));
-      setRemovedAny(true);
+      if (problem.autoRepeat) {
+        setPlaced([]);
+      } else {
+        setPlaced((prev) => prev.filter((p) => p.key !== key));
+        setMissed(true);
+      }
       playUndo();
     },
-    [crossing, paused],
+    [crossing, paused, problem.autoRepeat],
   );
+
+  /** 수직선에서 짚는 자리를 옮긴다. 옮길 때마다 양쪽 거리가 다시 보인다 */
+  const step = useCallback(
+    (dir: -1 | 1) => {
+      if (crossing || paused || !problem.numberLine) return;
+      const { span, a, b } = problem.numberLine;
+      const next = Math.max(0, Math.min(span, marker + dir));
+      setMarker(next);
+      playTap();
+      if (a !== undefined && b !== undefined && next !== a && next !== b) {
+        if (Math.abs(next - a) === Math.abs(next - b)) solve();
+      }
+    },
+    [crossing, paused, problem.numberLine, marker, solve],
+  );
+
+  /**
+   * 양쪽에 똑같이 들어 있는 물건을 지운다.
+   *
+   * 짝이 없는 것을 누르면 흔들리기만 한다 — **지울 수 있는 건 양쪽에 다 있는 것뿐**이라는
+   * 규칙 자체가 이 문제에서 배울 내용이라, 눌러 보고 알게 두는 편이 낫다.
+   */
+  const cancel = useCallback(
+    (block: ItemBlock, row: "top" | "bottom") => {
+      if (crossing || paused || !problem.pair) return;
+      const other = (row === "top" ? problem.pair.bottom : problem.pair.top).find(
+        (b) => b.name === block.name && !cleared.has(b.id),
+      );
+      if (!other) {
+        wobble();
+        return;
+      }
+      setCleared(new Set([...cleared, block.id, other.id]));
+      playUndo();
+    },
+    [crossing, paused, problem.pair, cleared, wobble],
+  );
+
+  /** 빠진 수 고르기 */
+  const choose = useCallback(
+    (n: number) => {
+      if (crossing || paused) return;
+      if (n === problem.target) {
+        solve();
+        return;
+      }
+      setMissed(true);
+      wobble();
+    },
+    [crossing, paused, problem.target, solve, wobble],
+  );
+
+  const line = problem.line;
+  const gapFrom = line ? line.gap.from : 0;
+
+  /** 가운데 알림 줄. 맞히면 방금 한 조작이 무슨 관계였는지 짚어 준다 */
+  const status = crossing
+    ? (problem.note ?? "건넜다!")
+    : problem.pair && !pairSettled
+      ? "양쪽에 똑같이 있는 것을 눌러 지워요"
+      : problem.numberLine?.a !== undefined
+      ? "양쪽 거리가 같아지는 자리를 찾아요"
+      : problem.numberLine
+        ? "눈금 사이가 얼마씩인지 보세요"
+        : remaining > 0
+          ? `${remaining}칸 더 필요해요`
+          : "딱 맞았어요!";
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-cream)]">
@@ -156,8 +286,10 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
         {problem.prompt}
       </p>
 
-      <div ref={bridgeRef} className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-5 overflow-hidden px-3">
-
+      <div
+        ref={bridgeRef}
+        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-hidden px-3"
+      >
         {/* 재야 할 자 — measure·offset 문제에만 나온다 */}
         {problem.onRuler && (
           <div className="relative z-10">
@@ -165,77 +297,213 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
           </div>
         )}
 
-        {/* 다리. 왼쪽 언덕에서 오른쪽 언덕까지 정확히 목표 길이만큼 비어 있다.
-            아래로 계곡을 깔아 왜 다리를 놓는지가 보이게 한다 — 빈 여백으로 두면
-            그냥 조각 맞추기가 되고, 수레가 건너는 장면도 밋밋해진다 */}
+        {/* 꺾인 길 — 맞히면 아래 한 줄로 쭉 펴진다.
+            다리와 같은 눈금으로, 다리 상판이 시작하는 자리에 왼쪽을 맞춰 놓는다.
+            펴진 길이 바로 아래 아이가 놓은 다리와 나란해야 "길이는 그대로"가 눈에 들어온다 */}
+        {problem.path && (
+          <div
+            style={{
+              // 다리와 **같은 폭**이어야 한다. 둘 다 가운데 정렬이라 폭이 다르면 왼쪽 끝이 어긋나고,
+              // 그러면 길이 펴져도 다리와 나란해 보이지 않아 이 문제의 요점이 사라진다
+              width: problem.target * unitPx + ABUTMENT * 2,
+              paddingLeft: ABUTMENT - pathPad(unitPx),
+            }}
+          >
+            <BentPath
+              cols={problem.path.cols}
+              rows={problem.path.rows}
+              vertices={problem.path.vertices}
+              cell={unitPx}
+              straight={crossing}
+            />
+          </div>
+        )}
+
+        {/* 두 줄 견주기 */}
+        {problem.pair && (
+          <PairRows
+            top={problem.pair.top}
+            bottom={problem.pair.bottom}
+            unitPx={unitPx}
+            cleared={cleared}
+            onTap={cancel}
+          />
+        )}
+
+        {/* 수직선 */}
+        {problem.numberLine && (
+          <div className="relative z-10">
+            <NumberLine
+              span={problem.numberLine.span}
+              step={problem.numberLine.step}
+              unitPx={unitPx}
+              a={problem.numberLine.a}
+              b={problem.numberLine.b}
+              hidden={crossing ? undefined : problem.numberLine.hidden}
+              marker={problem.numberLine.a !== undefined ? marker : undefined}
+            />
+          </div>
+        )}
+
         <p
           className="text-center text-sm font-black text-[var(--color-accent-deep)]"
           aria-live="polite"
         >
-          {crossing ? "건넜다!" : remaining > 0 ? `${remaining}칸 더 필요해요` : "딱 맞았어요!"}
+          {status}
         </p>
 
-        <div className={`relative z-10 ${shake ? "animate-[shake_0.36s_ease-in-out]" : ""}`}>
-          <div
-            className="pointer-events-none absolute left-9 right-9 top-9 -z-10 rounded-b-[40px] bg-gradient-to-b from-[#bfe3ea] to-[#8ec9d4]"
-            style={{ height: 86 }}
-            aria-hidden="true"
-          />
-          <div className="flex items-end">
-            <div className="h-14 w-9 rounded-l-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />
-            <div
-              className="relative flex h-14 items-center border-y-[3px] border-dashed border-[var(--color-accent-soft)] bg-[var(--color-accent-tint)]"
-              style={{ width: problem.target * unitPx }}
-            >
-              {placed.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => remove(p.key)}
-                  aria-label={`${p.units}칸 조각 빼기`}
-                  className="animate-[pop-in_0.22s_ease-out]"
-                >
-                  <PieceBar units={p.units} color={p.color} ticks={p.ticks} unitPx={unitPx} />
-                </button>
-              ))}
-              {/* 수레 — 다리가 완성되면 달려 건넌다 */}
-              {crossing && (
-                <span
-                  className="absolute -top-8 text-3xl animate-[cross_1.5s_ease-in-out_forwards]"
-                  aria-hidden="true"
-                >
-                  🛻
-                </span>
-              )}
-            </div>
-            <div className="h-14 w-9 rounded-r-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />
-          </div>
+        {/* 다리. 선분 문제에서는 이미 놓인 구간까지 함께 그리고, 빈 구간만 채운다.
+            아래로 계곡을 깔아 왜 다리를 놓는지가 보이게 한다 — 빈 여백으로 두면
+            그냥 조각 맞추기가 되고, 수레가 건너는 장면도 밋밋해진다 */}
+        {!problem.numberLine && (
+          <div className={`relative z-10 ${shake ? "animate-[shake_0.36s_ease-in-out]" : ""}`}>
+            {/* 호는 흐름 안에 둔다. 예전에는 다리 위에 띄워 뒀는데,
+                자리를 차지하지 않으니 위쪽 안내 문구와 겹쳐서 둘 다 못 읽었다 */}
+            {line && (
+              <div style={{ paddingLeft: ABUTMENT }}>
+                <SegmentArcs arcs={line.arcs} unitPx={unitPx} />
+              </div>
+            )}
 
-        </div>
+            {/* 선분 위의 점 */}
+            {line && (
+              <div className="relative h-5" style={{ marginLeft: ABUTMENT, width: line.span * unitPx }}>
+                {line.posts.map((p) => (
+                  <span
+                    key={p.label}
+                    className="absolute bottom-0 -translate-x-1/2 rounded-full border-2 border-[var(--color-line-deep)] bg-white px-1.5 text-[11px] font-black leading-[16px] text-[var(--color-ink)]"
+                    style={{ left: p.at * unitPx }}
+                  >
+                    {p.label}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="relative flex items-end">
+              {/* 계곡. 상판 줄을 기준으로 잡는다 — 바깥 상자를 기준으로 두면
+                  선분 문제에서 위쪽 호 자리까지 올라와 숫자를 덮는다 */}
+              <div
+                className="pointer-events-none absolute left-9 right-9 top-9 -z-10 rounded-b-[40px] bg-gradient-to-b from-[#bfe3ea] to-[#8ec9d4]"
+                style={{ height: 86 }}
+                aria-hidden="true"
+              />
+              <div className="h-14 w-9 rounded-l-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />
+
+              <div className="relative h-14" style={{ width: (line ? line.span : problem.target) * unitPx }}>
+                {/* 이미 놓여 있는 구간. 눈금을 그리지 않는다 —
+                    칸을 셀 수 있으면 위쪽 숫자를 볼 이유가 없어진다 */}
+                {line?.filled.map((f) => (
+                  <div
+                    key={f.from}
+                    className="absolute top-0 h-14 rounded-sm border-y-[3px] border-[#6b5138] bg-[#c9a879]"
+                    style={{ left: f.from * unitPx, width: (f.to - f.from) * unitPx }}
+                    aria-hidden="true"
+                  />
+                ))}
+
+                {/* 채워야 할 틈 */}
+                <div
+                  className="absolute top-0 flex h-14 items-center border-y-[3px] border-dashed border-[var(--color-accent-soft)] bg-[var(--color-accent-tint)]"
+                  style={{ left: gapFrom * unitPx, width: problem.target * unitPx }}
+                >
+                  {placed.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => remove(p.key)}
+                      aria-label={`${p.units}칸 조각 빼기`}
+                      className="animate-[pop-in_0.22s_ease-out]"
+                    >
+                      <PieceBar
+                        units={p.units}
+                        color={p.color}
+                        ticks={p.ticks}
+                        showLabel={p.label}
+                        unitPx={unitPx}
+                      />
+                    </button>
+                  ))}
+                  {/* 수레 — 다리가 완성되면 달려 건넌다 */}
+                  {crossing && (
+                    <span
+                      className="absolute -top-8 text-3xl animate-[cross_1.5s_ease-in-out_forwards]"
+                      aria-hidden="true"
+                    >
+                      🛻
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="h-14 w-9 rounded-r-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 조각 트레이 */}
-      <div className="border-t-2 border-[var(--color-line)] bg-[var(--color-card)] px-3 py-3 safe-bottom">
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          {problem.tray.map((piece) => (
-            <button
-              key={piece.id}
-              type="button"
-              onClick={() => place(piece)}
-              disabled={crossing}
-              aria-label={`${piece.units}칸 조각 놓기`}
-              className="transition-transform active:scale-95 disabled:opacity-40"
-            >
-              <PieceBar
-                units={piece.units}
-                color={piece.color}
-                ticks={piece.ticks}
-                unitPx={unitPx}
-                dimmed={piece.units > remaining}
-              />
-            </button>
-          ))}
-        </div>
+      {/* 아래 칸. 문제에 따라 조각 트레이 · 수직선 조작 · 고를 수가 들어온다 */}
+      <div className="shrink-0 border-t-2 border-[var(--color-line)] bg-[var(--color-card)] px-3 py-3 safe-bottom">
+        {problem.numberLine?.a !== undefined ? (
+          <div className="flex items-center justify-center gap-4">
+            {([-1, 1] as const).map((dir) => (
+              <button
+                key={dir}
+                type="button"
+                onClick={() => step(dir)}
+                disabled={crossing}
+                aria-label={dir < 0 ? "왼쪽으로 한 칸" : "오른쪽으로 한 칸"}
+                className="flex h-14 w-24 items-center justify-center rounded-2xl border-2 border-[var(--color-line)] bg-white text-2xl font-black text-[var(--color-ink)] shadow-[0_4px_0_var(--color-line-deep)] transition-transform active:translate-y-[2px] active:shadow-[0_2px_0_var(--color-line-deep)] disabled:opacity-40"
+              >
+                {dir < 0 ? "◀" : "▶"}
+              </button>
+            ))}
+          </div>
+        ) : problem.choices ? (
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {problem.choices.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => choose(n)}
+                disabled={crossing}
+                className="h-14 w-16 rounded-2xl border-2 border-[var(--color-line)] bg-white text-xl font-black text-[var(--color-ink)] shadow-[0_4px_0_var(--color-line-deep)] transition-transform active:translate-y-[2px] active:shadow-[0_2px_0_var(--color-line-deep)] disabled:opacity-40"
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {problem.tray.map((piece) => (
+              <button
+                key={piece.id}
+                type="button"
+                onClick={() => place(piece)}
+                disabled={crossing || !pairSettled}
+                aria-label={`${piece.units}칸 조각 놓기`}
+                className="transition-transform active:scale-95 disabled:opacity-40"
+              >
+                <PieceBar
+                  units={piece.units}
+                  color={piece.color}
+                  ticks={piece.ticks}
+                  showLabel={piece.label}
+                  unitPx={unitPx}
+                  dimmed={piece.units * (problem.autoRepeat ?? 1) > remaining}
+                />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 한꺼번에 놓이는 문제는 그렇다고 알려 준다. 눌러 보면 알지만
+            처음 만나면 왜 세 개가 붙는지 몰라 당황한다 */}
+        {problem.autoRepeat && (
+          <p className="mt-2 text-center text-[11px] font-black text-[var(--color-ink-soft)]">
+            누르면 {problem.autoRepeat}개가 한꺼번에 놓여요
+          </p>
+        )}
       </div>
 
       {paused && (

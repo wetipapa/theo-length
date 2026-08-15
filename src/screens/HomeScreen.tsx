@@ -73,7 +73,7 @@ export function HomeScreen({ settings, bestScore, onChange, onStart }: HomeScree
           <div className="flex flex-col gap-3 rounded-2xl border-2 border-[var(--color-line)] bg-[var(--color-card)] p-3">
             <div>
               <p className="mb-1.5 text-xs font-black text-[var(--color-ink-soft)]">난이도</p>
-              <div className="flex gap-1.5" role="group" aria-label="난이도">
+              <div className="flex gap-1" role="group" aria-label="난이도">
                 {(Object.keys(LEVELS) as LevelId[]).map((id) => (
                   <button
                     key={id}
@@ -83,7 +83,7 @@ export function HomeScreen({ settings, bestScore, onChange, onStart }: HomeScree
                       playTap();
                       onChange({ ...settings, level: id });
                     }}
-                    className={`min-h-11 flex-1 rounded-xl border-2 text-sm font-black transition-transform active:scale-95 ${
+                    className={`min-h-11 flex-1 rounded-xl border-2 text-[13px] font-black transition-transform active:scale-95 ${
                       settings.level === id
                         ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
                         : "border-[var(--color-line)] bg-white text-[var(--color-ink-soft)]"
@@ -95,11 +95,7 @@ export function HomeScreen({ settings, bestScore, onChange, onStart }: HomeScree
               </div>
             </div>
             <p className="text-xs font-bold text-[var(--color-ink-soft)]">
-              {settings.level === "easy"
-                ? "짧은 다리부터. 숫자로 알려주는 문제가 많아요"
-                : settings.level === "normal"
-                  ? "자로 재는 문제와 눈금 없는 조각이 섞여요"
-                  : "0이 아닌 곳에서 시작하는 자 읽기까지 나와요"}
+              {LEVELS[settings.level].hint}
             </p>
             <div className="flex flex-col gap-1.5">
               <Toggle
@@ -122,6 +118,7 @@ export function HomeScreen({ settings, bestScore, onChange, onStart }: HomeScree
             <li>2. 아래 조각을 눌러 <span className="text-[var(--color-accent)]">착</span> 붙여요</li>
             <li>3. 딱 맞으면 다리가 완성되고 수레가 건너요</li>
             <li>4. 잘못 놓았으면 그 조각을 눌러 빼면 돼요</li>
+            <li>5. 수직선은 화살표로 눈금을 짚고, 두 줄이 나오면 똑같은 것을 눌러 지워요</li>
             <li className="text-[var(--color-ink)]">틀려도 끝나지 않아요. 맞을 때까지 고쳐도 괜찮아요</li>
           </ol>
         )}
