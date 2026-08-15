@@ -2,6 +2,9 @@ import { PIECE_COLORS, RULES, type LevelId, type LevelSet } from "../config/game
 import { OBJECT_NAMES } from "../components/LengthObject";
 import type { Arc, ItemBlock, ObjectKind, Piece, Problem, ProblemKind } from "../types";
 
+/** 길이를 재는 물건들. 자 위에도 올라가고 두 줄 견주기에도 쓰인다 */
+const ITEMS: ObjectKind[] = ["log", "match", "pencil", "straw", "brush", "eraser"];
+
 export type Rng = () => number;
 
 /**
@@ -107,9 +110,12 @@ const freeTray = (rng: Rng, target: number, ticks = true) =>
 /**
  * 전체 ÷ 개수 → 한 조각.
  *
- * "12칸을 똑같은 조각 3개로 채워요." 조각 하나를 누르면 **세 개가 한꺼번에** 붙는다.
- * 한 개씩 놓게 하면 아이는 그냥 채우다가 맞추게 되고, 셋이 같은 길이라는 게 안 보인다.
- * 짧은 걸 골랐으면 틈이 남고, 긴 걸 골랐으면 아예 안 들어간다 — 둘 다 눈으로 답이 나온다.
+ * "12칸을 똑같은 조각 3개로 채워요." **틈이 세 칸으로 나뉘어 보이고**,
+ * 그 한 칸에 딱 맞는 조각만 들어간다. 맞는 걸 찾아 세 번 놓으면 끝난다.
+ *
+ * 예전에는 조각 하나를 누르면 세 개가 한꺼번에 붙게 했는데,
+ * 한 번 눌러서 답이 되니 생각할 것이 없었다. 나뉜 칸을 보고 거기 맞는 길이를
+ * 고르는 것이 곧 "전체를 개수로 나누기"다.
  */
 function sameParts(level: LevelSet, rng: Rng): Problem {
   // 개수와 한 조각을 정하면 전체가 따라 나온다. 난이도 범위에 들 때까지 다시 뽑는다
@@ -135,7 +141,7 @@ function sameParts(level: LevelSet, rng: Rng): Problem {
     tellsTarget: true,
     tray: makeTray(rng, [...sizes], true),
     rulerSpan: level.target.max + 2,
-    autoRepeat: count,
+    slots: count,
     note: `${target}칸을 ${count}개로 나누면 한 개는 ${unit}칸이에요`,
   };
 }
@@ -371,8 +377,6 @@ function bentPath(level: LevelSet, rng: Rng, bends: number): Problem {
 // 같은 전체를 두 가지로 만들기
 // ──────────────────────────────────────────────────────────────
 
-/** 두 줄 견주기에 나오는 물건들. 그림으로 구별하므로 굵기·모양이 서로 달라야 한다 */
-const ITEMS: ObjectKind[] = ["log", "match", "pencil", "straw", "brush", "eraser"];
 
 /**
  * 위아래 두 줄이 같은 길이다. 모르는 물건 하나가 몇 칸인지 알아낸다.
@@ -551,6 +555,7 @@ export function makeProblem(level: LevelSet, kind: ProblemKind, rng: Rng, levelI
       tellsTarget: false,
       tray: freeTray(rng, target),
       onRuler: { from, to: from + target, label: kind === "offset" ? "여기서부터" : "" },
+      rulerObject: pick(rng, ITEMS),
       rulerSpan,
     };
   }

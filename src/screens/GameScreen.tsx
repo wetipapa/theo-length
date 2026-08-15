@@ -152,48 +152,40 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
   /**
    * 조각을 다리에 올린다.
    *
-   * `autoRepeat` 문제는 **정해진 개수만큼 한꺼번에** 놓는다. 한 개씩 놓게 하면
-   * 아이는 그냥 채우다 맞추게 되고, 셋이 같은 길이라는 게 안 보인다.
+   * `slots` 문제는 틈이 똑같은 칸으로 나뉘어 있고, **한 칸에 딱 맞는 조각만** 들어간다.
+   * 예전에는 조각 하나를 누르면 정해진 개수가 한꺼번에 놓였는데,
+   * 한 번 눌러서 답이 되니 생각할 것이 없었다.
    */
   const place = useCallback(
     (piece: Piece) => {
       if (crossing || paused || !pairSettled) return;
-      const copies = problem.autoRepeat ?? 1;
-      if (piece.units * copies > remaining) {
+      const slotSize = problem.slots ? problem.target / problem.slots : null;
+      if (slotSize !== null ? piece.units !== slotSize : piece.units > remaining) {
         // 벌점 없이 되돌린다. 틀린 게 아니라 "이건 안 들어간다"를 보여 줄 뿐이다
         wobble();
         return;
       }
 
-      const next = [
-        ...placed,
-        ...Array.from({ length: copies }, () => ({ key: nextKey.current++, ...piece })),
-      ];
+      const next = [...placed, { key: nextKey.current++, ...piece }];
       setPlaced(next);
       playSnap(next.length - 1);
       if (sumUnits(next) === problem.target) solve();
     },
-    [crossing, paused, pairSettled, problem.autoRepeat, problem.target, remaining, placed, wobble, solve],
+    [crossing, paused, pairSettled, problem.slots, problem.target, remaining, placed, wobble, solve],
   );
 
   /**
    * 놓은 조각을 도로 빼낸다. 언제든 고칠 수 있어야 한다.
    *
-   * `autoRepeat` 문제는 통째로 빠지고 **보너스도 잃지 않는다.** 거기서는 여러 길이를
-   * 대 보는 것이 곧 푸는 방법이라, 대 봤다고 점수를 깎으면 대 보지 않게 된다.
    */
   const remove = useCallback(
     (key: number) => {
       if (crossing || paused) return;
-      if (problem.autoRepeat) {
-        setPlaced([]);
-      } else {
-        setPlaced((prev) => prev.filter((p) => p.key !== key));
-        setMissed(true);
-      }
+      setPlaced((prev) => prev.filter((p) => p.key !== key));
+      setMissed(true);
       playUndo();
     },
-    [crossing, paused, problem.autoRepeat],
+    [crossing, paused],
   );
 
   /** 수직선에서 짚는 자리를 옮긴다. 옮길 때마다 양쪽 거리가 다시 보인다 */
@@ -318,7 +310,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
         {/* 재야 할 자        {/* 재야 할 자 — measure·offset 문제에만 나온다 */}
         {problem.onRuler && (
           <div className="relative z-10">
-            <Ruler span={problem.rulerSpan} unitPx={unitPx} object={problem.onRuler} />
+            <Ruler span={problem.rulerSpan} unitPx={unitPx} object={problem.onRuler} kind={problem.rulerObject} />
           </div>
         )}
 
@@ -422,6 +414,18 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                   className="absolute top-0 flex h-full items-center rounded-sm border-y-[3px] border-dashed border-[var(--color-accent-soft)] bg-[#fffaf0cc]"
                   style={{ left: gapFrom * unitPx, width: problem.target * unitPx }}
                 >
+                  {/* 나뉜 칸. 12칸이 세 칸으로 갈린 걸 보고 그 한 칸에 맞는 조각을
+                      찾는 것이 곧 나눗셈이다 */}
+                  {problem.slots &&
+                    Array.from({ length: problem.slots - 1 }, (_, i) => (
+                      <span
+                        key={i}
+                        className="pointer-events-none absolute top-0 h-full w-[3px] -translate-x-1/2 rounded bg-[var(--color-accent-soft)]"
+                        style={{ left: `${((i + 1) / problem.slots!) * 100}%` }}
+                        aria-hidden="true"
+                      />
+                    ))}
+
                   {placed.map((p) => (
                     <button
                       key={p.key}
@@ -508,20 +512,13 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                   unitPx={unitPx}
                   // 목표를 알려주는 문제에서만 흐리게 한다. 아니면 5는 흐린데 4는 아닌 것만으로
                   // 남은 칸이 4라고 알려주는 셈이 된다. 대 봤다가 안 들어가는 건 벌점이 없다
-                  dimmed={problem.tellsTarget && piece.units * (problem.autoRepeat ?? 1) > remaining}
+                  dimmed={problem.tellsTarget && !problem.slots && piece.units > remaining}
                 />
               </button>
             ))}
           </div>
         )}
 
-        {/* 한꺼번에 놓이는 문제는 그렇다고 알려 준다. 눌러 보면 알지만
-            처음 만나면 왜 세 개가 붙는지 몰라 당황한다 */}
-        {problem.autoRepeat && (
-          <p className="mt-2 text-center text-[11px] font-black text-[var(--color-ink-soft)]">
-            누르면 {problem.autoRepeat}개가 한꺼번에 놓여요
-          </p>
-        )}
       </div>
 
       {paused && (

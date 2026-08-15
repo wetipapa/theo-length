@@ -1,3 +1,5 @@
+import { LengthObject } from "./LengthObject";
+import type { ObjectKind } from "../types";
 /**
  * 자.
  *
@@ -11,6 +13,7 @@ export function Ruler({
   span,
   unitPx,
   object,
+  kind,
 }: {
   /** 0부터 몇까지 그릴지 */
   span: number;
@@ -18,6 +21,8 @@ export function Ruler({
   unitPx: number;
   /** 자 위에 올려둘 물체 (재야 할 대상) */
   object?: { from: number; to: number; label: string };
+  /** 그 물체가 무엇인지. 매 문제 다른 물건이 올라온다 */
+  kind?: ObjectKind;
 }) {
   const width = span * unitPx;
 
@@ -26,10 +31,15 @@ export function Ruler({
       {/* 재야 할 물체. 자 바로 위에 붙여 놓아 눈금과 견주기 쉽게 한다 */}
       {object && (
         <>
+          {/* 예전에는 주황색 막대 하나였는데, 자 위에 막대가 또 있으니
+              그것마저 자처럼 보여서 무엇을 재라는 건지 헷갈렸다.
+              시작과 끝이 뚜렷한 물건을 매번 다르게 올린다 */}
           <div
-            className="absolute top-0 h-9 rounded-lg border-[3px] border-[#8a5a2b] bg-[#f2a33c] shadow-[0_2px_0_#c07c22]"
-            style={{ left: object.from * unitPx, width: (object.to - object.from) * unitPx }}
-          />
+            className="absolute top-0 flex items-center"
+            style={{ left: object.from * unitPx, width: (object.to - object.from) * unitPx, height: 36 }}
+          >
+            <LengthObject kind={kind ?? "log"} width={(object.to - object.from) * unitPx} height={30} />
+          </div>
           {/* 0이 아닌 데서 시작하면 어디서부터인지 짚어 준다.
               막대 가운데에 글자를 넣으면 정작 시작점을 가리키지 못한다 */}
           {object.from > 0 && (

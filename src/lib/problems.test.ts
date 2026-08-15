@@ -84,11 +84,13 @@ describe("어느 문제든 풀린다", () => {
     });
   });
 
-  it("한 번에 놓이는 개수가 목표를 넘지 않는다", () => {
-    // autoRepeat 배수를 잘못 잡으면 정답 조각인데도 안 들어간다
+  it("나뉜 칸에 딱 맞는 조각이 트레이에 하나뿐이다", () => {
+    // 한 칸에 맞는 조각이 없으면 못 풀고, 둘이면 아무거나 눌러도 되는 문제가 된다
     each(43, ["sameParts"], 200, (p) => {
-      const fits = p.tray.filter((t) => t.units * p.autoRepeat! === p.target);
-      expect(fits, `${p.target}칸 / ${p.autoRepeat}개`).toHaveLength(1);
+      const slot = p.target / p.slots!;
+      expect(Number.isInteger(slot)).toBe(true);
+      const fits = p.tray.filter((t) => t.units === slot);
+      expect(fits, `${p.target}칸 / ${p.slots}칸으로 나눔`).toHaveLength(1);
     });
   });
 });
@@ -107,11 +109,11 @@ describe("단위 반복의 세 방향", () => {
 
   it("sameParts — 전체와 개수를 주고 한 조각을 되짚게 한다", () => {
     each(47, ["sameParts"], 150, (p) => {
-      expect(p.autoRepeat).toBeGreaterThanOrEqual(2);
-      expect(p.target % p.autoRepeat!).toBe(0);
+      expect(p.slots).toBeGreaterThanOrEqual(2);
+      expect(p.target % p.slots!).toBe(0);
       // 개수는 알려주되 한 조각 길이는 알려주지 않는다. 그게 문제다
-      expect(p.prompt).toContain(`${p.autoRepeat}개`);
-      expect(p.prompt).not.toContain(`${p.target / p.autoRepeat!}칸 조각`);
+      expect(p.prompt).toContain(`${p.slots}개`);
+      expect(p.prompt).not.toContain(`${p.target / p.slots!}칸 조각`);
     });
   });
 
@@ -370,6 +372,23 @@ describe("같은 전체를 두 가지로", () => {
         byKind.set(b.kind, b.units);
       }
     });
+  });
+});
+
+describe("자 위에 올라오는 물건", () => {
+  it("재는 문제마다 물건이 정해져 있다", () => {
+    each(191, ["measure", "offset"], 120, (p) => {
+      expect(p.rulerObject, `${p.kind}`).toBeDefined();
+    });
+  });
+
+  it("늘 같은 물건만 나오지 않는다", () => {
+    // 하나로 고정하면 그게 또 하나의 자처럼 보인다
+    const seen = new Set<string>();
+    each(193, ["measure"], 120, (p) => {
+      if (p.rulerObject) seen.add(p.rulerObject);
+    });
+    expect(seen.size).toBeGreaterThan(3);
   });
 });
 
