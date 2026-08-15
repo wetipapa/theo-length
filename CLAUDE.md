@@ -3,6 +3,7 @@
 조각을 이어 붙여 다리를 놓는 6~9세용 길이 개념 게임.
 상위 규칙은 `Wetipapa/CLAUDE.md`를 따르고, 여기에는 이 게임에만 해당하는 것만 적는다.
 
+- 저장소: `wetipapa/theo-length`
 - 스택: Vite + React 19 + Tailwind v4 (캔버스 없이 DOM/CSS로만 그린다)
 - 배포 예정 주소: `length.wetipapa.com`
 
