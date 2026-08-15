@@ -452,6 +452,37 @@ describe("한 판", () => {
   });
 });
 
+describe("답을 흘리지 않는다", () => {
+  it("알아내야 하는 문제는 목표를 문구에 적지 않는다", () => {
+    // tellsTarget이 거짓이면 화면 어디에도 남은 칸 수가 안 나온다.
+    // 반대로 참인데 문구에 목표가 없으면 아이가 알 길이 사라진다
+    each(167, ALL, 150, (p) => {
+      if (p.tellsTarget) {
+        expect(p.prompt, `${p.kind}`).toContain(String(p.target));
+      } else {
+        expect(p.prompt, `${p.kind}`).not.toContain(`${p.target}칸`);
+      }
+    });
+  });
+
+  it("재고 세어야 하는 문제는 전부 알려주지 않는 쪽이다", () => {
+    // 여기 하나라도 참이 섞이면 그 종류는 답이 화면에 적힌 채로 나온다
+    const hidden: ProblemKind[] = [
+      "measure", "offset", "repeat", "unitOnly",
+      "segments", "bentPath", "cancelPair", "midpoint", "tickGap",
+    ];
+    each(173, hidden, 60, (p) => {
+      expect(p.tellsTarget, `${p.kind}`).toBe(false);
+    });
+  });
+
+  it("숫자로 알려주는 문제는 알려준다고 표시돼 있다", () => {
+    each(179, ["count", "blank", "sameParts", "countUnit"], 60, (p) => {
+      expect(p.tellsTarget, `${p.kind}`).toBe(true);
+    });
+  });
+});
+
 describe("문구", () => {
   it("수 뒤의 와/과를 읽는 소리에 맞춘다", () => {
     // "12과 22"는 아이가 소리 내어 읽을 때 걸린다. 받침 없는 이·사·오·구만 "와"다

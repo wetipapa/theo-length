@@ -21,6 +21,8 @@ import type { ItemBlock, Placed, Piece, RunResult } from "../types";
 
 /** 다리 양쪽 교대의 폭(px). 아래 `w-9`와 같은 값이어야 한다 */
 const ABUTMENT = 36;
+/** 계곡이 상판 아래로 내려오는 길이(px). 계곡 그림 높이 86에서 상판에 가린 20을 뺀 값 */
+const VALLEY_DROP = 66;
 
 interface GameScreenProps {
   settings: Settings;
@@ -249,18 +251,28 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
   const line = problem.line;
   const gapFrom = line ? line.gap.from : 0;
 
-  /** 가운데 알림 줄. 맞히면 방금 한 조작이 무슨 관계였는지 짚어 준다 */
+  /**
+   * 가운데 알림 줄.
+   *
+   * **목표를 알려주지 않는 문제에서는 남은 칸 수를 적지 않는다.**
+   * 알아내는 것이 문제인데 "5칸 더 필요해요"라고 써 두면 답을 그냥 알려주는 셈이다.
+   * 대신 지금까지 놓은 만큼을 보여 준다 — 아이가 센 것을 확인해 주되 답은 말하지 않는다.
+   */
   const status = crossing
     ? (problem.note ?? "건넜다!")
     : problem.pair && !pairSettled
       ? "양쪽에 똑같이 있는 것을 눌러 지워요"
       : problem.numberLine?.a !== undefined
-      ? "양쪽 거리가 같아지는 자리를 찾아요"
-      : problem.numberLine
-        ? "눈금 사이가 얼마씩인지 보세요"
-        : remaining > 0
-          ? `${remaining}칸 더 필요해요`
-          : "딱 맞았어요!";
+        ? "양쪽 거리가 같아지는 자리를 찾아요"
+        : problem.numberLine
+          ? "눈금 사이가 얼마씩인지 보세요"
+          : problem.tellsTarget
+            ? remaining > 0
+              ? `${remaining}칸 더 필요해요`
+              : "딱 맞았어요!"
+            : filled > 0
+              ? `지금까지 ${filled}칸`
+              : "얼마나 필요할지 알아내 보세요";
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-cream)]">
@@ -282,14 +294,17 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
         <p className="text-xl font-black text-[var(--color-ink)]">{score}</p>
       </header>
 
-      <p className="mx-4 mt-2 rounded-2xl border-2 border-[var(--color-line)] bg-[var(--color-card)] px-4 py-2.5 text-center text-sm font-black text-[var(--color-ink)]">
-        {problem.prompt}
-      </p>
-
       <div
         ref={bridgeRef}
-        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-hidden px-3"
+        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-3"
       >
+        {/* 문구를 판과 한 덩어리로 묶어 가운데 정렬한다.
+            맨 위에 붙여 두면 남는 세로 공간이 전부 문구와 판 사이로 몰려
+            둘이 상관없는 것처럼 멀어진다 */}
+        <p className="mb-1 w-full max-w-sm rounded-2xl border-2 border-[var(--color-line)] bg-[var(--color-card)] px-4 py-2.5 text-center text-sm font-black text-[var(--color-ink)]">
+          {problem.prompt}
+        </p>
+
         {/* 재야 할 자 — measure·offset 문제에만 나온다 */}
         {problem.onRuler && (
           <div className="relative z-10">
@@ -356,7 +371,13 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
             아래로 계곡을 깔아 왜 다리를 놓는지가 보이게 한다 — 빈 여백으로 두면
             그냥 조각 맞추기가 되고, 수레가 건너는 장면도 밋밋해진다 */}
         {!problem.numberLine && (
-          <div className={`relative z-10 ${shake ? "animate-[shake_0.36s_ease-in-out]" : ""}`}>
+          <div
+            className={`relative z-10 ${shake ? "animate-[shake_0.36s_ease-in-out]" : ""}`}
+            // 계곡은 자리를 차지하지 않는 그림이라 가운데 정렬이 상판까지만 보고 계산한다.
+            // 그러면 눈에 보이는 덩어리는 아래로 쏠리고 위쪽만 휑하게 남는다.
+            // 계곡이 상판 아래로 내려온 만큼을 자리로 잡아 줘야 실제로 가운데에 놓인다
+            style={{ paddingBottom: VALLEY_DROP }}
+          >
             {/* 호는 흐름 안에 둔다. 예전에는 다리 위에 띄워 뒀는데,
                 자리를 차지하지 않으니 위쪽 안내 문구와 겹쳐서 둘 다 못 읽었다 */}
             {line && (
@@ -427,7 +448,9 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                   {/* 수레 — 다리가 완성되면 달려 건넌다 */}
                   {crossing && (
                     <span
-                      className="absolute -top-8 text-3xl animate-[cross_1.5s_ease-in-out_forwards]"
+                      // 수레 그림이 왼쪽을 보고 있어서 뒤집어 준다.
+                      // 안 뒤집으면 오른쪽으로 가면서 후진하는 것처럼 보인다
+                      className="absolute -top-8 scale-x-[-1] text-3xl animate-[cross_1.5s_ease-in-out_forwards]"
                       aria-hidden="true"
                     >
                       🛻
@@ -490,7 +513,9 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                   ticks={piece.ticks}
                   showLabel={piece.label}
                   unitPx={unitPx}
-                  dimmed={piece.units * (problem.autoRepeat ?? 1) > remaining}
+                  // 목표를 알려주는 문제에서만 흐리게 한다. 아니면 5는 흐린데 4는 아닌 것만으로
+                  // 남은 칸이 4라고 알려주는 셈이 된다. 대 봤다가 안 들어가는 건 벌점이 없다
+                  dimmed={problem.tellsTarget && piece.units * (problem.autoRepeat ?? 1) > remaining}
                 />
               </button>
             ))}

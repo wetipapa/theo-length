@@ -131,6 +131,7 @@ function sameParts(level: LevelSet, rng: Rng): Problem {
     kind: "sameParts",
     target,
     prompt: `${target}칸을 똑같은 조각 ${count}개로 채워요`,
+    tellsTarget: true,
     tray: makeTray(rng, [...sizes], true),
     rulerSpan: level.target.max + 2,
     autoRepeat: count,
@@ -157,6 +158,7 @@ function countUnit(level: LevelSet, rng: Rng): Problem {
     kind: "countUnit",
     target,
     prompt: `${unit}칸 조각만으로 ${target}칸을 채워요`,
+    tellsTarget: true,
     tray: makeTray(rng, [unit], true),
     rulerSpan: level.target.max + 2,
     note: `${unit}칸 조각 ${count}개면 ${target}칸이에요`,
@@ -200,6 +202,7 @@ function unitOnlyPair(level: LevelSet, rng: Rng): Problem[] {
     kind: "unitOnly",
     target,
     prompt: "이 조각 하나로만 틈을 채워 보세요",
+    tellsTarget: false,
     tray: [{ id: 0, units: unit, color, ticks: false, label: false }],
     rulerSpan,
     note,
@@ -278,6 +281,7 @@ function segments(level: LevelSet, rng: Rng, overlap: boolean): Problem {
     prompt: overlap
       ? `겹치는 구간을 보고 ${from}~${to}를 채워요`
       : `${from}~${to}가 몇 칸인지 알아내 채워요`,
+    tellsTarget: false,
     tray: freeTray(rng, target),
     rulerSpan: level.target.max + 2,
     line: { span, posts, gap, filled, arcs },
@@ -354,6 +358,7 @@ function bentPath(level: LevelSet, rng: Rng, bends: number): Problem {
     kind: "bentPath",
     target: total,
     prompt: "꺾인 길이 몇 칸인지 세어 보고 곧은 다리로 놓아요",
+    tellsTarget: false,
     tray: freeTray(rng, total),
     rulerSpan: level.target.max + 2,
     path: { cols, rows, vertices },
@@ -408,6 +413,7 @@ function cancelPair(level: LevelSet, rng: Rng): Problem {
     kind: "cancelPair",
     target: unknownUnits,
     prompt: `위아래 길이가 같아요. ${unknown.name} 하나는 몇 칸일까요?`,
+    tellsTarget: false,
     tray: freeTray(rng, unknownUnits),
     rulerSpan: level.target.max + 2,
     pair: {
@@ -454,6 +460,7 @@ function midpoint(level: LevelSet, rng: Rng): Problem {
     kind: "midpoint",
     target: answer,
     prompt: `${withParticle(a)} ${b}의 한가운데를 짚어 보세요`,
+    tellsTarget: false,
     tray: [],
     rulerSpan: span,
     numberLine: { span, step, a, b },
@@ -485,6 +492,7 @@ function tickGap(level: LevelSet, rng: Rng): Problem {
     kind: "tickGap",
     target: hidden,
     prompt: "?에 들어갈 수는 무엇일까요?",
+    tellsTarget: false,
     tray: [],
     rulerSpan: span,
     numberLine: { span, step, hidden },
@@ -527,6 +535,7 @@ export function makeProblem(level: LevelSet, kind: ProblemKind, rng: Rng, levelI
       kind,
       target,
       prompt: `${unit}칸 조각 ${target / unit}개로 다리를 놓아요`,
+      tellsTarget: false,
       tray: makeTray(rng, [unit], true),
       rulerSpan,
       note: `${unit}칸이 ${target / unit}개면 ${target}칸이에요`,
@@ -544,6 +553,7 @@ export function makeProblem(level: LevelSet, kind: ProblemKind, rng: Rng, levelI
         kind === "offset"
           ? "자 위 막대와 똑같은 길이로 놓아요"
           : "자로 재어 보고 똑같은 길이로 놓아요",
+      tellsTarget: false,
       tray: freeTray(rng, target),
       onRuler: { from, to: from + target, label: kind === "offset" ? "여기서부터" : "" },
       rulerSpan,
@@ -555,6 +565,7 @@ export function makeProblem(level: LevelSet, kind: ProblemKind, rng: Rng, levelI
     kind,
     target,
     prompt: `${target}칸짜리 다리를 놓아요`,
+    tellsTarget: true,
     tray: freeTray(rng, target, kind !== "blank"),
     rulerSpan,
   };
