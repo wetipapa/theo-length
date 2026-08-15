@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { BlogLink } from "../components/BlogLink";
 import { HubLink } from "../components/HubLink";
 import { Button } from "../components/ui/Button";
 import { playTap } from "../lib/feedback";
+import { buildResultImage, saveResultImage } from "../lib/resultImage";
 import type { RunResult } from "../types";
+import wetiProud from "../assets/characters/weti-proud.png";
+import wetiHappy from "../assets/characters/weti-happy.png";
+import wetiIdle from "../assets/characters/weti-idle.png";
 
 interface ResultScreenProps {
   result: RunResult;
@@ -19,11 +24,39 @@ interface ResultScreenProps {
  * 대신 "한 번에 놓은 다리"를 세어 다시 해볼 이유를 만든다.
  */
 export function ResultScreen({ result, bestScore, onRetry, onHome }: ResultScreenProps) {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
+
+  const savePhoto = async () => {
+    playTap();
+    setSaving(true);
+    setSaved(null);
+    try {
+      const blob = await buildResultImage(result, bestScore);
+      if (!blob) {
+        setSaved("저장하지 못했어요");
+        return;
+      }
+      const outcome = await saveResultImage(blob, `길이척척_${result.score}점.png`);
+      setSaved(outcome === "failed" ? "저장하지 못했어요" : "사진으로 저장했어요!");
+    } catch {
+      setSaved("저장하지 못했어요");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const face = result.isBest ? wetiProud : result.perfect > 0 ? wetiHappy : wetiIdle;
   const headline = result.isBest ? "새 최고 기록이에요!" : "다리를 다 놓았어요!";
 
   return (
     <div className="theme-service flex h-full flex-col items-center justify-center gap-4 overflow-y-auto px-5 py-6 safe-top safe-bottom">
-      <div className="text-6xl" aria-hidden="true">🌉</div>
+      <img
+        src={face}
+        alt=""
+        aria-hidden="true"
+        className="h-24 w-24 rounded-full border-4 border-[var(--color-accent-soft)] bg-white object-cover"
+      />
 
       <div className="text-center">
         <p className="text-sm font-black text-[var(--color-ink-soft)]">{headline}</p>
@@ -38,9 +71,18 @@ export function ResultScreen({ result, bestScore, onRetry, onHome }: ResultScree
         <Stat label="한 번에 놓기" value={`${result.perfect}개`} />
       </div>
 
+      {saved && (
+        <p className="text-sm font-black text-[var(--color-accent-deep)]" role="status">
+          {saved}
+        </p>
+      )}
+
       <div className="mt-4 flex w-full max-w-xs flex-col gap-2">
         <Button size="xl" onClick={() => { playTap(); onRetry(); }}>
           한 번 더 하기
+        </Button>
+        <Button variant="soft" size="md" onClick={savePhoto} disabled={saving}>
+          {saving ? "사진 만드는 중…" : "기록 사진으로 저장"}
         </Button>
         <Button variant="soft" size="sm" onClick={() => { playTap(); onHome(); }}>
           설정 바꾸기
