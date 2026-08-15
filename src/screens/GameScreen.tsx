@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BentPath, pathPad } from "../components/BentPath";
+import { BANK_W, BridgeScene } from "../components/BridgeScene";
 import { NumberLine } from "../components/NumberLine";
 import { PairRows } from "../components/PairRows";
 import { PieceBar } from "../components/PieceBar";
@@ -19,16 +20,8 @@ import {
 import { makeRun, sumUnits } from "../lib/problems";
 import type { ItemBlock, Placed, Piece, RunResult } from "../types";
 
-/** 다리 양쪽 교대의 폭(px). 아래 `w-9`와 같은 값이어야 한다 */
-const ABUTMENT = 36;
-/**
- * 계곡 그림의 높이(px)와, 그것이 상판 아래로 내려오는 길이.
- *
- * 계곡을 깊게 그리면 그림이 세로 공간을 채워서, 문제와 조각 트레이 사이가
- * 휑하게 비는 것도 같이 줄어든다. 상판에 20px이 가리므로 그만큼 뺀 값이 실제로 내려오는 길이다.
- */
-const VALLEY_H = 116;
-const VALLEY_DROP = VALLEY_H - 20;
+/** 다리 양쪽 언덕의 폭(px). BridgeScene의 BANK_W를 그대로 쓴다 */
+const ABUTMENT = BANK_W;
 
 interface GameScreenProps {
   settings: Settings;
@@ -258,27 +251,21 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
   const gapFrom = line ? line.gap.from : 0;
 
   /**
-   * 가운데 알림 줄.
+   * 문제 아래 한 줄로 붙는 보조 안내.
    *
-   * **목표를 알려주지 않는 문제에서는 남은 칸 수를 적지 않는다.**
-   * 알아내는 것이 문제인데 "5칸 더 필요해요"라고 써 두면 답을 그냥 알려주는 셈이다.
-   * 대신 지금까지 놓은 만큼을 보여 준다 — 아이가 센 것을 확인해 주되 답은 말하지 않는다.
+   * **평소에는 아무것도 띄우지 않는다.** 예전에는 늘 초록 글씨 한 줄이 떠 있었는데,
+   * `8칸짜리 다리를 놓아요` 바로 밑에 `8칸 더 필요해요`가 나오는 식이라
+   * 문제를 두 번 읽는 꼴이었다. 조각을 눌러 보면 알 것을 굳이 적고 있었다.
+   *
+   * 조작이 평소와 다른 판에서만 한 줄 쓴다.
    */
-  const status = crossing
-    ? (problem.note ?? "건넜다!")
-    : problem.pair && !pairSettled
-      ? "양쪽에 똑같이 있는 것을 눌러 지워요"
-      : problem.numberLine?.a !== undefined
-        ? "양쪽 거리가 같아지는 자리를 찾아요"
-        : problem.numberLine
-          ? "눈금 사이가 얼마씩인지 보세요"
-          : problem.tellsTarget
-            ? remaining > 0
-              ? `${remaining}칸 더 필요해요`
-              : "딱 맞았어요!"
-            : filled > 0
-              ? `지금까지 ${filled}칸`
-              : "얼마나 필요할지 알아내 보세요";
+  const hint = problem.pair && !pairSettled
+    ? "위아래에 똑같이 있는 것을 눌러 지워요"
+    : problem.numberLine?.a !== undefined
+      ? "화살표로 옮기며 양쪽 거리가 같아지는 자리를 찾아요"
+      : problem.numberLine
+        ? "눈금 사이가 얼마씩인지 보세요"
+        : null;
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-cream)]">
@@ -308,16 +295,27 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
             맨 위에 붙여 두면 남는 세로 공간이 전부 문제와 판 사이로 몰려
             둘이 상관없는 것처럼 멀어진다.
 
-            글씨를 키우고 어깨에 「문제」를 박아 둔다. 예전에는 안내 문구와 같은 크기,
-            같은 색이라 무엇이 물음이고 무엇이 거드는 말인지 구별이 안 됐다 */}
-        <div className="relative mb-1 w-full max-w-sm rounded-2xl border-2 border-[var(--color-accent-soft)] bg-white px-4 pb-3 pt-4 shadow-[0_3px_0_var(--color-accent-tint)]">
+            맞히면 이 카드가 그대로 칭찬 자리가 된다. 따로 띄우면 눈이 두 군데를 봐야 한다 */}
+        <div
+          className={`relative mb-1 w-full max-w-sm rounded-2xl border-2 px-4 pb-3 pt-4 transition-colors ${
+            crossing
+              ? "border-[var(--color-accent)] bg-[var(--color-accent-tint)] shadow-[0_3px_0_var(--color-accent-soft)]"
+              : "border-[var(--color-accent-soft)] bg-white shadow-[0_3px_0_var(--color-accent-tint)]"
+          }`}
+          aria-live="polite"
+        >
           <span className="absolute -top-2.5 left-4 rounded-full bg-[var(--color-accent)] px-2.5 text-[11px] font-black leading-[20px] text-white">
-            문제 {round + 1}
+            {crossing ? "잘했어요" : `문제 ${round + 1}`}
           </span>
-          <p className="text-center text-base font-black leading-snug text-[var(--color-ink)]">{problem.prompt}</p>
+          <p className="text-center text-lg font-black leading-snug text-[var(--color-ink)]">
+            {crossing ? (problem.note ?? "다리를 건넜어요!") : problem.prompt}
+          </p>
+          {!crossing && hint && (
+            <p className="mt-1 text-center text-xs font-bold text-[var(--color-accent-deep)]">{hint}</p>
+          )}
         </div>
 
-        {/* 재야 할 자 — measure·offset 문제에만 나온다 */}
+        {/* 재야 할 자        {/* 재야 할 자 — measure·offset 문제에만 나온다 */}
         {problem.onRuler && (
           <div className="relative z-10">
             <Ruler span={problem.rulerSpan} unitPx={unitPx} object={problem.onRuler} />
@@ -373,23 +371,13 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
           </div>
         )}
 
-        <p
-          className="text-center text-sm font-black text-[var(--color-accent-deep)]"
-          aria-live="polite"
-        >
-          {status}
-        </p>
-
         {/* 다리. 선분 문제에서는 이미 놓인 구간까지 함께 그리고, 빈 구간만 채운다.
             아래로 계곡을 깔아 왜 다리를 놓는지가 보이게 한다 — 빈 여백으로 두면
             그냥 조각 맞추기가 되고, 수레가 건너는 장면도 밋밋해진다 */}
         {!problem.numberLine && (
           <div
-            className={`relative z-10 ${shake ? "animate-[shake_0.36s_ease-in-out]" : ""}`}
-            // 계곡은 자리를 차지하지 않는 그림이라 가운데 정렬이 상판까지만 보고 계산한다.
-            // 그러면 눈에 보이는 덩어리는 아래로 쏠리고 위쪽만 휑하게 남는다.
-            // 계곡이 상판 아래로 내려온 만큼을 자리로 잡아 줘야 실제로 가운데에 놓인다
-            style={{ paddingBottom: VALLEY_DROP }}
+            // 위쪽 여백은 수레가 상판에 올라설 자리다. 없으면 수레가 문제 카드를 파고든다
+            className={`relative z-10 w-full pt-11 ${shake ? "animate-[shake_0.36s_ease-in-out]" : ""}`}
           >
             {/* 호는 흐름 안에 둔다. 예전에는 다리 위에 띄워 뒀는데,
                 자리를 차지하지 않으니 위쪽 안내 문구와 겹쳐서 둘 다 못 읽었다 */}
@@ -414,23 +402,14 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
               </div>
             )}
 
-            <div className="relative flex items-end">
-              {/* 계곡. 상판 줄을 기준으로 잡는다 — 바깥 상자를 기준으로 두면
-                  선분 문제에서 위쪽 호 자리까지 올라와 숫자를 덮는다 */}
-              <div
-                className="pointer-events-none absolute left-9 right-9 top-9 -z-10 rounded-b-[40px] bg-gradient-to-b from-[#bfe3ea] to-[#8ec9d4]"
-                style={{ height: VALLEY_H }}
-                aria-hidden="true"
-              />
-              <div className="h-14 w-9 rounded-l-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />
-
-              <div className="relative h-14" style={{ width: (line ? line.span : problem.target) * unitPx }}>
+            <BridgeScene deckWidth={(line ? line.span : problem.target) * unitPx}>
+              <div className="relative h-full">
                 {/* 이미 놓여 있는 구간. 눈금을 그리지 않는다 —
                     칸을 셀 수 있으면 위쪽 숫자를 볼 이유가 없어진다 */}
                 {line?.filled.map((f) => (
                   <div
                     key={f.from}
-                    className="absolute top-0 h-14 rounded-sm border-y-[3px] border-[#6b5138] bg-[#c9a879]"
+                    className="absolute top-0 h-full rounded-sm border-y-[3px] border-[#6b5138] bg-[#c9a879]"
                     style={{ left: f.from * unitPx, width: (f.to - f.from) * unitPx }}
                     aria-hidden="true"
                   />
@@ -438,7 +417,9 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
 
                 {/* 채워야 할 틈 */}
                 <div
-                  className="absolute top-0 flex h-14 items-center border-y-[3px] border-dashed border-[var(--color-accent-soft)] bg-[var(--color-accent-tint)]"
+                  // 틈은 비워 둔다. 예전에는 물빛으로 칠해서 "비었다"가 아니라
+                  // "물이 차 있다"로 읽혔다
+                  className="absolute top-0 flex h-full items-center rounded-sm border-y-[3px] border-dashed border-[var(--color-accent-soft)] bg-[#fffaf0cc]"
                   style={{ left: gapFrom * unitPx, width: problem.target * unitPx }}
                 >
                   {placed.map((p) => (
@@ -463,7 +444,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                     <span
                       // 수레 그림이 왼쪽을 보고 있어서 뒤집어 준다.
                       // 안 뒤집으면 오른쪽으로 가면서 후진하는 것처럼 보인다
-                      className="absolute -top-8 scale-x-[-1] text-3xl animate-[cross_1.5s_ease-in-out_forwards]"
+                      className="absolute -top-10 z-20 scale-x-[-1] text-5xl animate-[cross_1.5s_ease-in-out_forwards]"
                       aria-hidden="true"
                     >
                       🛻
@@ -472,8 +453,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
                 </div>
               </div>
 
-              <div className="h-14 w-9 rounded-r-lg bg-[#8a6a4a] shadow-[0_4px_0_#6b5138]" />
-            </div>
+            </BridgeScene>
           </div>
         )}
       </div>
