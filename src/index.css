@@ -63,10 +63,37 @@ html,
 body,
 #root {
   height: 100%;
+  /* 높이를 화면에 딱 맞춰 두므로 페이지가 스크롤될 일이 없다.
+     막아 두지 않으면 아이가 놀다가 손가락을 끌 때 화면이 통째로 밀린다 */
+  overflow: hidden;
+}
+
+/*
+ * 화면 높이.
+ *
+ * **iOS 사파리에서 `100vh`는 주소창까지 포함한 높이다.** 실제로 보이는 영역보다
+ * 100px쯤 커서, 화면 맨 아래에 붙는 것들이 도구막대 뒤로 들어간다.
+ * `100dvh`가 지금 보이는 높이다. 데스크톱에서는 두 값이 같아 아무 문제가 안 보인다.
+ *
+ * 폴백은 `@supports`로 적는다. 같은 속성을 두 줄 쓰는 흔한 방법은
+ * 빌드할 때 압축기가 앞줄을 지워 버려서 구형 사파리에 높이가 아예 안 남는다.
+ */
+.h-viewport {
+  height: 100dvh;
+}
+
+/* 사파리 15.4 미만. 주소창까지 포함한 높이라도 없는 것보다는 낫다 */
+@supports not (height: 100dvh) {
+  .h-viewport {
+    height: 100vh;
+  }
 }
 
 body {
   margin: 0;
+  /* iOS가 글자를 제멋대로 키우면 화면에 딱 맞춰 둔 배치가 넘친다 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--color-cream);
   color: var(--color-ink);
   font-family: var(--font-rounded);

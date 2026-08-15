@@ -38,7 +38,7 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen w-full justify-center bg-[#e9dcc3]">
+    <div className="h-viewport flex w-full justify-center bg-[#e9dcc3]">
       <div className="relative h-full w-full max-w-md overflow-hidden bg-[var(--color-cream)] shadow-2xl">
         {screen === "home" && (
           <HomeScreen
