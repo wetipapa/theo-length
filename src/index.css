@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/*
+ * 색은 WTPP 브랜드 팔레트에서 온다 (brand-assets/BRAND_GUIDE.md §5).
+ * 형제 서비스와 같은 뼈대(크림 바탕·따뜻한 글자색·두툼한 아래 그림자)를 공유하고
+ * 서비스 색만 다르게 둔다. 색까지 같으면 어느 게임에 들어왔는지 알 수 없고,
+ * 배경까지 통째로 물들이면 다섯 서비스가 한 브랜드로 안 보인다.
+ */
+@theme {
+  --color-cream: #fff6ea;
+  --color-cream-deep: #ffedd3;
+  --color-card: #fffaf1;
+  --color-sunset: #ff8a5c;
+  --color-sunset-deep: #d95f34;
+  --color-sunset-soft: #ffb08a;
+  --color-sky: #8fd3e8;
+  --color-sky-deep: #4fa8c2;
+  --color-honey: #ffd166;
+  --color-ink: #4a3626;
+  --color-ink-soft: #8a6a4a;
+  --color-line: #f1e0c4;
+  --color-line-deep: #e8d9c0;
+
+  /* 브랜드 아이덴티티 색 — 공식·강조 자리에만 */
+  --color-navy: #013075;
+
+  /* 길이 척척의 서비스 색. 흰 글자 대비 5.10:1로 형제 서비스와 같은 무게다.
+     자와 눈금을 닮은 청록 — 기존 다섯(블루·레드오렌지·초록·바이올렛·자홍)과 겹치지 않는다. */
+  --color-accent: #0f7a80;
+  --color-accent-deep: #0a565a;
+  --color-accent-soft: #7cc3c7;
+  --color-accent-tint: #e0f2f3;
+
+  --font-rounded: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif;
+}
+
+/*
+ * 서비스 색을 입히는 자리. 첫 화면과 결과 화면에만 두른다.
+ * 게임 화면에는 두르지 않는다 — 거기는 조각의 색이 길이를 구분하는 단서라,
+ * 배경까지 청록으로 물들이면 조각 경계가 흐려진다.
+ */
+.theme-service {
+  --color-sunset: var(--color-accent);
+  --color-sunset-deep: var(--color-accent-deep);
+  --color-sunset-soft: var(--color-accent-soft);
+  --color-cream: #f4fafa;
+  --color-cream-deep: #ddf0f1;
+  --color-card: #fcfeff;
+  --color-line: #cfe7e8;
+  --color-line-deep: #b8d9db;
+  background: var(--color-cream);
+}
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-rounded);
+  /* 게임 중 손가락을 그으면 화면이 따라 움직이면 안 된다 */
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 조각이 안 들어갈 때 다리가 흔들린다. 야단이 아니라 "여긴 안 맞아"라는 신호다 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  45% { transform: translateX(6px); }
+  70% { transform: translateX(-3px); }
+}
+
+/* 다리가 완성되면 수레가 건넌다. 짧고 한 번에 끝나야 다음 문제로 넘어가는 리듬이 산다 */
+@keyframes cross {
+  0% { left: -34px; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: calc(100% + 10px); opacity: 0; }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
