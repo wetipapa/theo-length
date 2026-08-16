@@ -6,6 +6,7 @@ import { ResultScreen } from "./screens/ResultScreen";
 import type { Settings } from "./config/gameConfig";
 import { setHaptics, setSound } from "./lib/feedback";
 import { load, saveScore, saveSettings } from "./lib/storage";
+import { trackStart, trackComplete, trackReplay } from "./lib/track";
 import type { RunResult } from "./types";
 
 type Screen = "home" | "game" | "result";
@@ -25,12 +26,15 @@ function App() {
     setHaptics(next.haptics);
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback((again = false) => {
+    if (again) trackReplay();
+    trackStart();
     setRunId((n) => n + 1);
     setScreen("game");
   }, []);
 
   const end = useCallback((r: RunResult) => {
+    trackComplete();
     saveScore(r.score);
     setResult(r);
     setRecord(load());
@@ -50,7 +54,7 @@ function App() {
             settings={record.settings}
             bestScore={record.bestScore}
             onChange={changeSettings}
-            onStart={start}
+            onStart={() => start()}
           />
         )}
         {screen === "game" && (
@@ -66,7 +70,7 @@ function App() {
           <ResultScreen
             result={result}
             bestScore={record.bestScore}
-            onRetry={start}
+            onRetry={() => start(true)}
             onHome={() => setScreen("home")}
           />
         )}
