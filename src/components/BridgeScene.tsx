@@ -30,12 +30,33 @@ export const BANK_W = 40;
  * CSS 덩어리로 눈과 등만 그려 봤는데 초록 막대에 흰 점이라 악어로 안 읽혔다.
  * 옆모습을 통째로 그리는 편이 훨씬 잘 읽힌다 — 주둥이·눈·등의 톱니·꼬리가 다 보여야 한다.
  */
-function Crocodile({ top }: { top: number }) {
+function Crocodile({
+  top,
+  width,
+  dir,
+  seconds,
+  delay,
+}: {
+  top: number;
+  width: number;
+  /** 헤엄치는 방향. 반대로 가는 놈이 섞여야 강이 살아 있어 보인다 */
+  dir: "right" | "left";
+  seconds: number;
+  /** 음수로 준다. 화면을 열자마자 이미 헤엄치고 있는 상태가 된다 */
+  delay: number;
+}) {
+  const toLeft = dir === "left";
   return (
     <svg
       viewBox="0 0 120 34"
-      className="absolute animate-[float-across_16s_linear_infinite]"
-      style={{ top, left: "-22%", width: 96 }}
+      className={toLeft ? "absolute animate-[swim-left_linear_infinite]" : "absolute animate-[swim-right_linear_infinite]"}
+      style={{
+        top,
+        width,
+        [toLeft ? "right" : "left"]: "-24%",
+        animationDuration: `${seconds}s`,
+        animationDelay: `${delay}s`,
+      }}
       aria-hidden="true"
     >
       {/* 꼬리 — 뒤로 갈수록 가늘어진다 */}
@@ -109,10 +130,15 @@ export function BridgeScene({
           }}
           aria-hidden="true"
         >
-          {/* 강을 헤엄쳐 지나가는 악어.
+          {/* 강을 헤엄쳐 지나가는 악어들.
               아이가 다리를 놓는 이유를 한 컷으로 말해 준다 — 저기로 걸어 건널 수는 없다.
-              아주 느리게 움직인다. 빠르면 눈이 그쪽으로 끌려가 정작 다리를 못 본다 */}
-          <Crocodile top={riverH * 0.45} />
+
+              깊이·크기·속도를 다르게 하고 **방향을 엇갈리게** 둔다.
+              셋이 같은 쪽으로 나란히 가면 컨베이어 벨트처럼 보인다.
+              모두 아주 느리다 — 빠르면 눈이 그쪽으로 끌려가 정작 다리를 못 본다 */}
+          <Crocodile top={riverH * 0.1} width={74} dir="left" seconds={19} delay={-3} />
+          <Crocodile top={riverH * 0.42} width={96} dir="right" seconds={15} delay={-8} />
+          <Crocodile top={riverH * 0.72} width={66} dir="left" seconds={24} delay={-15} />
 
           {[0.18, 0.42, 0.66].map((t, i) => (
             <div
