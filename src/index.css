@@ -150,3 +150,20 @@ body {
     transform: translateY(-6px);
   }
 }
+
+/* 강에 떠다니는 악어. 아주 느리게 지나가야 배경으로 남는다 —
+   빠르면 눈이 그쪽으로 끌려가서 정작 다리를 못 본다 */
+@keyframes float-across {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(140vw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[float-across_16s_linear_infinite\] {
+    animation: none;
+  }
+}

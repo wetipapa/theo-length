@@ -38,8 +38,13 @@ function App() {
   }, []);
 
   return (
-    <div className="h-viewport flex w-full justify-center bg-[#e9dcc3]">
-      <div className="relative h-full w-full max-w-md overflow-hidden bg-[var(--color-cream)] shadow-2xl">
+    <div className="h-viewport flex w-full items-center justify-center bg-[#e9dcc3]">
+      {/* 폭만 묶어 두면 창이 긴 화면에서 판과 조각 트레이가 멀찍이 떨어진다.
+          조각을 고르려고 눈과 손이 멀리 움직여야 하는데, 이 게임은 그 둘을
+          번갈아 보는 게임이다.
+
+          **높은 화면에서만** 세로도 묶는다. 폰까지 묶으면 위아래에 띠가 생긴다 */}
+      <div className="relative h-full w-full max-w-md overflow-hidden bg-[var(--color-cream)] shadow-2xl [@media(min-height:760px)]:max-h-[700px]">
         {screen === "home" && (
           <HomeScreen
             settings={record.settings}

@@ -84,9 +84,10 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
    * 화면이 길면 문제·판·조각이 가운데 몰리고 위아래로 크림색 여백만 남는다.
    * 남는 세로 자리를 강이 가져가게 해서, 빈 곳을 줄이면서 장면도 시원해진다.
    *
-   * 너무 깊게 파면 강이 아니라 우물처럼 보이므로 상한을 둔다.
+   * 다만 깊게 팔수록 판이 위로 밀려 조각 트레이와 멀어진다. 이 게임은 판과 조각을
+   * 번갈아 보는 게임이라 그게 더 손해다. 그래서 상한을 낮게 잡았다.
    */
-  const riverH = Math.round(Math.max(RIVER_H, Math.min(170, (box.h - 300) * 0.6)));
+  const riverH = Math.round(Math.max(RIVER_H, Math.min(140, (box.h - 320) * 0.5)));
 
   const unitPx = useMemo(() => {
     // 화면에 나오는 것 중 **가장 넓은 것**에 맞춘다. 하나만 보고 정하면 나머지가 넘친다 —
@@ -294,8 +295,11 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
 
       <div
         ref={bridgeRef}
-        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden px-3 pb-2"
+        // 남는 세로 자리를 위 2 : 아래 1로 나눈다. 반씩 나누면 판이 조각 트레이에서
+        // 멀어지는데, 이 게임은 판과 조각을 번갈아 보는 게임이라 아래쪽이 가까워야 한다
+        className="relative flex min-h-0 flex-1 flex-col items-center gap-2 overflow-hidden px-3 pb-2"
       >
+        <div className="flex-[2] shrink" aria-hidden="true" />
         {/* 문제. 판과 한 덩어리로 묶어 가운데 정렬한다 —
             맨 위에 붙여 두면 남는 세로 공간이 전부 문제와 판 사이로 몰려
             둘이 상관없는 것처럼 멀어진다.
@@ -473,6 +477,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
             </BridgeScene>
           </div>
         )}
+        <div className="flex-[1] shrink" aria-hidden="true" />
       </div>
 
       {/* 아래 칸. 문제에 따라 조각 트레이 · 수직선 조작 · 고를 수가 들어온다 */}
