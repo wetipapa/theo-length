@@ -1,6 +1,6 @@
 # 캐릭터 이미지
 
-`Wetipapa/brand-assets/confirmed/`의 확정 자산에서 가져온 사본이다.
+`WTPP/brand-assets/confirmed/`의 확정 자산에서 가져온 사본이다.
 **여기서 그림을 고치지 않는다.** 원본을 바꿔야 하면 `brand-assets` 쪽을 고치고 다시 뽑는다.
 (각 저장소는 독립 배포되므로 `brand-assets`를 코드에서 직접 참조할 수 없다.)
 
