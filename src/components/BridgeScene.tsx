@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /** 상판 높이(px) */
 export const DECK_H = 58;
-/** 상판 아래 강의 깊이(px) */
+/** 상판 아래 강의 **기본** 깊이(px). 화면에 자리가 남으면 더 깊게 그린다 */
 export const RIVER_H = 96;
 /**
  * 양쪽 언덕의 **최소** 폭(px).
@@ -24,13 +24,22 @@ export const BANK_W = 40;
  *   "비어 있다"가 아니라 "물이 차 있다"로 읽혔다
  * - **아래로 갈수록 깊어지고 잔물결이 흐른다.** 한 색으로 칠하면 종이처럼 보인다
  */
-export function BridgeScene({ deckWidth, children }: { deckWidth: number; children: ReactNode }) {
+export function BridgeScene({
+  deckWidth,
+  riverH = RIVER_H,
+  children,
+}: {
+  deckWidth: number;
+  /** 강의 깊이. 화면에 자리가 남으면 깊게 그려 빈 공간을 줄인다 */
+  riverH?: number;
+  children: ReactNode;
+}) {
   const bank = (side: "left" | "right") => (
     <div
       className="relative flex-1"
       style={{
         minWidth: BANK_W,
-        height: DECK_H + RIVER_H,
+        height: DECK_H + riverH,
         background: "linear-gradient(180deg,#a9825a 0%,#8a6a4a 38%,#6b5138 100%)",
         borderRadius: side === "left" ? "6px 0 0 6px" : "0 6px 6px 0",
       }}
@@ -50,13 +59,13 @@ export function BridgeScene({ deckWidth, children }: { deckWidth: number; childr
     <div className="relative flex w-full items-start">
       {bank("left")}
 
-      <div className="relative shrink-0" style={{ width: deckWidth, height: DECK_H + RIVER_H }}>
+      <div className="relative shrink-0" style={{ width: deckWidth, height: DECK_H + riverH }}>
         {/* 강 — 상판 아래에서 시작한다 */}
         <div
           className="absolute inset-x-0 overflow-hidden"
           style={{
             top: DECK_H,
-            height: RIVER_H,
+            height: riverH,
             background: "linear-gradient(180deg,#9fd8e8 0%,#5fb6d4 45%,#2e86b0 100%)",
           }}
           aria-hidden="true"
@@ -65,7 +74,7 @@ export function BridgeScene({ deckWidth, children }: { deckWidth: number; childr
             <div
               key={t}
               className="absolute h-[3px] rounded-full bg-white/35"
-              style={{ top: RIVER_H * t, left: `${8 + i * 14}%`, width: `${34 - i * 6}%` }}
+              style={{ top: riverH * t, left: `${8 + i * 14}%`, width: `${34 - i * 6}%` }}
             />
           ))}
         </div>

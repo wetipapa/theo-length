@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BentPath, pathPad } from "../components/BentPath";
-import { BANK_W, BridgeScene } from "../components/BridgeScene";
+import { BANK_W, RIVER_H, BridgeScene } from "../components/BridgeScene";
 import { NumberLine } from "../components/NumberLine";
 import { PairRows } from "../components/PairRows";
 import { PieceBar } from "../components/PieceBar";
@@ -66,14 +66,27 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
 
   // 한 칸의 픽셀 길이. 목표가 길어도 화면 밖으로 나가지 않게 폭에 맞춰 줄인다.
   // 이 값이 게임 안의 "1칸"이고, 실제 1cm가 아니다.
-  const [boxWidth, setBoxWidth] = useState(340);
+  const [box, setBox] = useState({ w: 340, h: 460 });
   useEffect(() => {
     const el = bridgeRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([e]) => setBoxWidth(e.contentRect.width));
+    const ro = new ResizeObserver(([e]) =>
+      setBox({ w: e.contentRect.width, h: e.contentRect.height }),
+    );
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const boxWidth = box.w;
+
+  /**
+   * 강의 깊이.
+   *
+   * 화면이 길면 문제·판·조각이 가운데 몰리고 위아래로 크림색 여백만 남는다.
+   * 남는 세로 자리를 강이 가져가게 해서, 빈 곳을 줄이면서 장면도 시원해진다.
+   *
+   * 너무 깊게 파면 강이 아니라 우물처럼 보이므로 상한을 둔다.
+   */
+  const riverH = Math.round(Math.max(RIVER_H, Math.min(170, (box.h - 300) * 0.6)));
 
   const unitPx = useMemo(() => {
     // 화면에 나오는 것 중 **가장 넓은 것**에 맞춘다. 하나만 보고 정하면 나머지가 넘친다 —
@@ -281,7 +294,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
 
       <div
         ref={bridgeRef}
-        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden px-3 pb-1"
+        className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden px-3 pb-2"
       >
         {/* 문제. 판과 한 덩어리로 묶어 가운데 정렬한다 —
             맨 위에 붙여 두면 남는 세로 공간이 전부 문제와 판 사이로 몰려
@@ -394,7 +407,7 @@ export function GameScreen({ settings, bestScore, onEnd, onQuit }: GameScreenPro
               </div>
             )}
 
-            <BridgeScene deckWidth={(line ? line.span : problem.target) * unitPx}>
+            <BridgeScene deckWidth={(line ? line.span : problem.target) * unitPx} riverH={riverH}>
               <div className="relative h-full">
                 {/* 이미 놓여 있는 구간. 눈금을 그리지 않는다 —
                     칸을 셀 수 있으면 위쪽 숫자를 볼 이유가 없어진다 */}
